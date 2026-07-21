@@ -1,14 +1,15 @@
 (function () {
   "use strict";
 
-  var PLUGIN_VERSION = "0.4.3";
+  var PLUGIN_VERSION = "0.4.4";
   var PLAYER_SELECTOR = ".stash-slideshow-player";
   var AUDIO_PANEL_SELECTOR = ".stash-slideshow-wave-player";
   var SETTINGS_ATTRIBUTE = "data-stash-slideshow-hotkey-settings";
   var STORAGE_KEY = "stash.imageSlideshow.hotkeys.v1";
   var LEGACY_CODES = ["ArrowLeft", "ArrowRight", "Space", "KeyK", "KeyM"];
+  var MODIFIERS = ["Shift", "Control", "Alt", "Meta"];
   var DEFAULT_CONFIG = {
-    mode: "linked",
+    linkedModifier: "Shift",
     slideshow: {
       previous: "ArrowLeft",
       next: "ArrowRight",
@@ -20,14 +21,13 @@
       toggle: "KeyM"
     }
   };
-
   var ACTIONS = [
-    { id: "slideshow.previous", group: "Slideshow", label: "Previous image" },
-    { id: "slideshow.next", group: "Slideshow", label: "Next image" },
-    { id: "slideshow.toggle", group: "Slideshow", label: "Play / pause" },
-    { id: "audio.rewind", group: "Audio", label: "Rewind 10 seconds" },
-    { id: "audio.forward", group: "Audio", label: "Forward 10 seconds" },
-    { id: "audio.toggle", group: "Audio", label: "Play / pause" }
+    { id: "slideshow.previous", group: "Slideshow", label: "Previous image", linked: "previous" },
+    { id: "slideshow.next", group: "Slideshow", label: "Next image", linked: "next" },
+    { id: "slideshow.toggle", group: "Slideshow", label: "Play / pause", linked: "toggle" },
+    { id: "audio.rewind", group: "Audio", label: "Rewind 10 seconds", linked: "previous" },
+    { id: "audio.forward", group: "Audio", label: "Forward 10 seconds", linked: "next" },
+    { id: "audio.toggle", group: "Audio", label: "Play / pause", linked: "toggle" }
   ];
 
   var config = loadConfig();
@@ -47,7 +47,7 @@
     var input = value && typeof value === "object" ? value : {};
     var defaults = cloneDefaults();
     return {
-      mode: input.mode === "separate" ? "separate" : "linked",
+      linkedModifier: MODIFIERS.indexOf(input.linkedModifier) !== -1 ? input.linkedModifier : defaults.linkedModifier,
       slideshow: {
         previous: sanitizeBinding(input.slideshow && input.slideshow.previous, defaults.slideshow.previous),
         next: sanitizeBinding(input.slideshow && input.slideshow.next, defaults.slideshow.next),
@@ -105,6 +105,24 @@
     return parts.join("+");
   }
 
+  function bindingContainsModifier(binding, modifier) {
+    return String(binding || "").split("+").indexOf(modifier) !== -1;
+  }
+
+  function removeModifier(binding, modifier) {
+    return String(binding || "").split("+").filter(function (part) {
+      return part !== modifier;
+    }).join("+");
+  }
+
+  function modifierActive(event, modifier) {
+    if (modifier === "Shift") return event.shiftKey;
+    if (modifier === "Control") return event.ctrlKey;
+    if (modifier === "Alt") return event.altKey;
+    if (modifier === "Meta") return event.metaKey;
+    return false;
+  }
+
   function displayCode(code) {
     var labels = {
       ArrowLeft: "←",
@@ -139,6 +157,17 @@
     });
   }
 
+  function getActionForBinding(binding) {
+    var matched = ACTIONS.find(function (action) {
+      return getActionBinding(action.id) === binding;
+    });
+    if (matched) return matched;
+    if (binding === "KeyK" && config.slideshow.toggle === "Space") {
+      return ACTIONS.find(function (action) { return action.id === "slideshow.toggle"; });
+    }
+    return null;
+  }
+
   function eventTargetIsEditable(event) {
     var target = event.target;
     if (!target || target.nodeType !== 1) return false;
@@ -167,8 +196,7 @@
 
   function setSlideshowPlaying(player, shouldPlay) {
     var button = getSlideshowToggleButton(player);
-    if (!button) return;
-    if (slideshowIsPlaying(player) !== shouldPlay) button.click();
+    if (button && slideshowIsPlaying(player) !== shouldPlay) button.click();
   }
 
   function moveSlideshow(player, direction) {
@@ -192,8 +220,7 @@
   }
 
   function toggleAudio(media) {
-    if (!media) return;
-    setAudioPlaying(media, media.paused);
+    if (media) setAudioPlaying(media, media.paused);
   }
 
   function seekAudio(media, seconds) {
@@ -213,7 +240,7 @@
     setAudioPlaying(media, shouldPlay);
   }
 
-  function runAction(actionId, player, repeated) {
+  function runSeparateAction(actionId, player, repeated) {
     var media = getAudioElement(player);
     if ((actionId === "slideshow.toggle" || actionId === "audio.toggle") && repeated) return;
     if (actionId === "slideshow.previous") moveSlideshow(player, -1);
@@ -224,41 +251,49 @@
     if (actionId === "audio.toggle") toggleAudio(media);
   }
 
-  function handleLinkedHotkey(event, binding, player) {
+  function runLinkedAction(kind, player, repeated) {
     var media = getAudioElement(player);
-    if (binding === "ArrowLeft") {
+    if (kind === "toggle" && repeated) return;
+    if (kind === "previous") {
       moveSlideshow(player, -1);
       seekAudio(media, -10);
-      return true;
     }
-    if (binding === "ArrowRight") {
+    if (kind === "next") {
       moveSlideshow(player, 1);
       seekAudio(media, 10);
-      return true;
     }
-    if (binding === "Space" || binding === "KeyK") {
-      if (!event.repeat) syncPlayPause(player);
-      return true;
-    }
-    if (binding === "KeyM") {
-      if (!event.repeat) toggleAudio(media);
-      return true;
-    }
-    return false;
+    if (kind === "toggle") syncPlayPause(player);
   }
 
-  function handleSeparateHotkey(event, binding, player) {
-    var matched = ACTIONS.find(function (action) {
-      return getActionBinding(action.id) === binding;
-    });
-    if (matched) {
-      runAction(matched.id, player, event.repeat);
-      return true;
+  function handleKeydown(event) {
+    if (capture) {
+      handleCapture(event);
+      return;
     }
 
-    // Prevent the original slideshow listener from continuing to use its
-    // hard-coded legacy bindings after the user enables separate mode.
-    return LEGACY_CODES.indexOf(binding) !== -1;
+    var player = getPlayer();
+    if (!player || eventTargetIsEditable(event)) return;
+    var binding = bindingFromEvent(event);
+    if (!binding) return;
+
+    if (modifierActive(event, config.linkedModifier)) {
+      var baseBinding = removeModifier(binding, config.linkedModifier);
+      var linkedAction = getActionForBinding(baseBinding);
+      if (linkedAction) {
+        runLinkedAction(linkedAction.linked, player, event.repeat);
+        stopHotkeyEvent(event);
+      }
+      return;
+    }
+
+    var action = getActionForBinding(binding);
+    if (action) {
+      runSeparateAction(action.id, player, event.repeat);
+      stopHotkeyEvent(event);
+      return;
+    }
+
+    if (LEGACY_CODES.indexOf(binding) !== -1) stopHotkeyEvent(event);
   }
 
   function updateCaptureMessage(message, isError) {
@@ -288,8 +323,12 @@
     }
     var binding = bindingFromEvent(event);
     if (!binding) return;
+    if (bindingContainsModifier(binding, config.linkedModifier)) {
+      updateCaptureMessage(displayBinding(binding) + " uses the linked modifier. Choose an unmodified separate-control key.", true);
+      return;
+    }
     if (bindingUsedByAnother(capture.actionId, binding)) {
-      updateCaptureMessage(displayBinding(binding) + " is already assigned to another action.", true);
+      updateCaptureMessage(displayBinding(binding) + " is already assigned to another separate action.", true);
       return;
     }
     var actionId = capture.actionId;
@@ -297,51 +336,83 @@
     setActionBinding(actionId, binding);
   }
 
-  function handleKeydown(event) {
-    if (capture) {
-      handleCapture(event);
-      return;
-    }
-
-    var player = getPlayer();
-    if (!player || eventTargetIsEditable(event)) return;
-    var binding = bindingFromEvent(event);
-    if (!binding) return;
-
-    var handled = config.mode === "linked"
-      ? handleLinkedHotkey(event, binding, player)
-      : handleSeparateHotkey(event, binding, player);
-
-    if (handled) stopHotkeyEvent(event);
-  }
-
-  function createModeControl(section) {
-    var label = document.createElement("label");
-    label.className = "stash-slideshow-hotkey-mode";
-    var text = document.createElement("span");
-    text.textContent = "Control mode";
-    var select = document.createElement("select");
-    select.innerHTML = '<option value="linked">Linked: slideshow and audio together</option><option value="separate">Separate configurable hotkeys</option>';
-    select.value = config.mode;
-    select.addEventListener("change", function () {
-      var next = sanitizeConfig(config);
-      next.mode = select.value === "separate" ? "separate" : "linked";
-      saveConfig(next);
-    });
-    label.appendChild(text);
-    label.appendChild(select);
-    section.appendChild(label);
-  }
-
   function startCapture(action, button, section) {
     if (capture) finishCapture(true);
     capture = { actionId: action.id, button: button, section: section };
     button.classList.add("is-capturing");
     button.textContent = "Press a key…";
-    updateCaptureMessage("Press the new key or key combination. Press Esc to cancel.", false);
+    updateCaptureMessage("Press an unmodified key or key combination. Press Esc to cancel.", false);
   }
 
-  function createSeparateBindings(section) {
+  function appendKbd(parent, binding) {
+    var kbd = document.createElement("kbd");
+    kbd.textContent = displayBinding(binding);
+    parent.appendChild(kbd);
+  }
+
+  function createModifierControl(body, section) {
+    var label = document.createElement("label");
+    label.className = "stash-slideshow-hotkey-mode";
+    var text = document.createElement("span");
+    text.textContent = "Linked-control modifier";
+    var select = document.createElement("select");
+    MODIFIERS.forEach(function (modifier) {
+      var option = document.createElement("option");
+      option.value = modifier;
+      option.textContent = modifier === "Control" ? "Ctrl" : modifier;
+      select.appendChild(option);
+    });
+    select.value = config.linkedModifier;
+    select.addEventListener("change", function () {
+      var nextModifier = select.value;
+      var conflict = ACTIONS.find(function (action) {
+        return bindingContainsModifier(getActionBinding(action.id), nextModifier);
+      });
+      if (conflict) {
+        select.value = config.linkedModifier;
+        var status = section.querySelector(".stash-slideshow-hotkey-status");
+        if (status) {
+          status.textContent = "That modifier is already part of the " + conflict.label.toLowerCase() + " binding.";
+          status.classList.add("is-error");
+        }
+        return;
+      }
+      var next = sanitizeConfig(config);
+      next.linkedModifier = nextModifier;
+      saveConfig(next);
+    });
+    label.appendChild(text);
+    label.appendChild(select);
+    body.appendChild(label);
+  }
+
+  function createLinkedPreview(body) {
+    var preview = document.createElement("div");
+    preview.className = "stash-slideshow-hotkey-summary";
+    var heading = document.createElement("strong");
+    heading.textContent = "Linked controls";
+    preview.appendChild(heading);
+
+    [
+      { first: "slideshow.previous", second: "audio.rewind", text: "previous image + rewind audio 10 seconds" },
+      { first: "slideshow.next", second: "audio.forward", text: "next image + forward audio 10 seconds" },
+      { first: "slideshow.toggle", second: "audio.toggle", text: "synchronize slideshow and audio play/pause" }
+    ].forEach(function (item) {
+      var row = document.createElement("span");
+      appendKbd(row, config.linkedModifier + "+" + getActionBinding(item.first));
+      row.appendChild(document.createTextNode(" or "));
+      appendKbd(row, config.linkedModifier + "+" + getActionBinding(item.second));
+      row.appendChild(document.createTextNode(" — " + item.text));
+      preview.appendChild(row);
+    });
+
+    var note = document.createElement("small");
+    note.textContent = "Without the modifier, every binding controls only its separate slideshow or audio action.";
+    preview.appendChild(note);
+    body.appendChild(preview);
+  }
+
+  function createBindingGrid(body, section) {
     var grid = document.createElement("div");
     grid.className = "stash-slideshow-hotkey-grid";
     var currentGroup = "";
@@ -351,10 +422,9 @@
         currentGroup = action.group;
         var heading = document.createElement("strong");
         heading.className = "stash-slideshow-hotkey-group";
-        heading.textContent = currentGroup;
+        heading.textContent = currentGroup + " — separate controls";
         grid.appendChild(heading);
       }
-
       var row = document.createElement("div");
       row.className = "stash-slideshow-hotkey-row";
       var label = document.createElement("span");
@@ -369,61 +439,58 @@
       grid.appendChild(row);
     });
 
-    section.appendChild(grid);
-
-    var reset = document.createElement("button");
-    reset.type = "button";
-    reset.className = "stash-slideshow-hotkey-reset";
-    reset.textContent = "Reset separate hotkeys";
-    reset.addEventListener("click", function () {
-      var next = cloneDefaults();
-      next.mode = "separate";
-      saveConfig(next);
-    });
-    section.appendChild(reset);
-  }
-
-  function createLinkedSummary(section) {
-    var summary = document.createElement("div");
-    summary.className = "stash-slideshow-hotkey-summary";
-    summary.innerHTML = "<strong>Linked controls</strong><span><kbd>←</kbd>/<kbd>→</kbd> changes the image and skips audio 10 seconds.</span><span><kbd>Space</kbd> or <kbd>K</kbd> synchronizes slideshow and audio play/pause.</span><span><kbd>M</kbd> controls audio only.</span>";
-    section.appendChild(summary);
+    body.appendChild(grid);
   }
 
   function renderSettingsSection(section) {
     if (capture && capture.section === section) capture = null;
+    var wasOpen = section.open;
     section.replaceChildren();
 
-    var heading = document.createElement("div");
-    heading.className = "stash-slideshow-hotkey-heading";
-    var title = document.createElement("h3");
-    title.textContent = "Hotkeys";
-    var description = document.createElement("small");
-    description.textContent = "Choose whether transport shortcuts control both players or use independent bindings.";
-    heading.appendChild(title);
-    heading.appendChild(description);
-    section.appendChild(heading);
+    var summary = document.createElement("summary");
+    summary.className = "stash-slideshow-hotkey-menu-summary";
+    var title = document.createElement("span");
+    title.textContent = "Hotkey controls";
+    var current = document.createElement("small");
+    current.textContent = "Linked modifier: " + (config.linkedModifier === "Control" ? "Ctrl" : config.linkedModifier);
+    summary.appendChild(title);
+    summary.appendChild(current);
+    section.appendChild(summary);
 
-    createModeControl(section);
-    if (config.mode === "separate") createSeparateBindings(section);
-    else createLinkedSummary(section);
+    var body = document.createElement("div");
+    body.className = "stash-slideshow-hotkey-menu-body";
+    var description = document.createElement("p");
+    description.textContent = "Use unmodified bindings for separate slideshow or audio control. Hold the linked modifier with any matching transport key to control both together.";
+    body.appendChild(description);
+    createModifierControl(body, section);
+    createLinkedPreview(body);
+    createBindingGrid(body, section);
+
+    var reset = document.createElement("button");
+    reset.type = "button";
+    reset.className = "stash-slideshow-hotkey-reset";
+    reset.textContent = "Reset all hotkeys";
+    reset.addEventListener("click", function () { saveConfig(cloneDefaults()); });
+    body.appendChild(reset);
 
     var status = document.createElement("small");
     status.className = "stash-slideshow-hotkey-status";
     status.setAttribute("aria-live", "polite");
-    section.appendChild(status);
+    body.appendChild(status);
+    section.appendChild(body);
+    section.open = wasOpen;
   }
 
   function createSettingsSection(container) {
-    var section = document.createElement("section");
+    var section = document.createElement("details");
     section.className = "stash-slideshow-hotkey-settings";
     section.setAttribute(SETTINGS_ATTRIBUTE, "true");
+    section.open = container.classList.contains("stash-slideshow-settings");
     renderSettingsSection(section);
 
     var anchor = container.querySelector(".stash-slideshow-shortcuts, .stash-slideshow-start");
     if (anchor) container.insertBefore(section, anchor);
     else container.appendChild(section);
-    return section;
   }
 
   function decorateSettingsContainer(container) {
@@ -471,16 +538,17 @@
   window.StashImageSlideshowHotkeys = {
     version: PLUGIN_VERSION,
     getConfig: function () { return sanitizeConfig(config); },
-    setMode: function (mode) {
+    setLinkedModifier: function (modifier) {
       var next = sanitizeConfig(config);
-      next.mode = mode === "separate" ? "separate" : "linked";
+      next.linkedModifier = MODIFIERS.indexOf(modifier) !== -1 ? modifier : DEFAULT_CONFIG.linkedModifier;
       saveConfig(next);
     },
     reset: function () { saveConfig(cloneDefaults()); },
     _test: {
       sanitizeConfig: sanitizeConfig,
       bindingFromEvent: bindingFromEvent,
-      displayBinding: displayBinding
+      displayBinding: displayBinding,
+      removeModifier: removeModifier
     }
   };
 
