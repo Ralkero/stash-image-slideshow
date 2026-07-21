@@ -78,6 +78,8 @@ test("manifest dependency order and responsive player styles are packaged", () =
   const plugin = manifest.indexOf("stash-image-slideshow.js");
   assert.ok(core >= 0 && core < timeline && timeline < hover && hover < plugin);
   assert.match(css, /\.stash-slideshow-wave-player/);
+  assert.match(css, /\.stash-slideshow-player:fullscreen/);
+  assert.match(css, /height: 100dvh/);
   assert.match(css, /@media \(max-width: 760px\)/);
   assert.match(css, /@media \(max-width: 560px\)/);
 });

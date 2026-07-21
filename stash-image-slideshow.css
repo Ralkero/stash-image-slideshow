@@ -583,10 +583,37 @@
 .stash-slideshow-player {
   position: fixed;
   inset: 0;
+  width: 100vw;
+  width: 100dvw;
+  height: 100vh;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
   z-index: 10800;
   overflow: hidden;
   color: white;
   user-select: none;
+}
+
+.stash-slideshow-player:fullscreen,
+.stash-slideshow-player:-webkit-full-screen {
+  inset: 0;
+  width: 100vw;
+  width: 100dvw;
+  height: 100vh;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+}
+
+.stash-slideshow-player:fullscreen .stash-slideshow-stage,
+.stash-slideshow-player:fullscreen .stash-slideshow-image,
+.stash-slideshow-player:-webkit-full-screen .stash-slideshow-stage,
+.stash-slideshow-player:-webkit-full-screen .stash-slideshow-image {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
 }
 
 .stash-slideshow-background-media {
