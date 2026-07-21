@@ -20,7 +20,7 @@ Because the Images-page operation reuses Stash's active GraphQL filter, it works
 - Sort order and direction
 - Source-picker sorting by name or image count; empty galleries, tags, studios, and performers are hidden
 - Shuffle, continuous loop, captions, and next-image preloading
-- Fullscreen support
+- Fullscreen support with dynamic viewport reflow on desktop and mobile
 - Optional native Audio record or legacy Scene video as the background clip
 
 ### Background audio player

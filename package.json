@@ -1,6 +1,6 @@
 {
   "name": "stash-image-slideshow",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "private": true,
   "description": "Native image slideshows with WaveSurfer-backed audio playback for Stash.",
   "scripts": {

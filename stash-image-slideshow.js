@@ -2,7 +2,7 @@
   "use strict";
 
   var PLUGIN_ID = "stash-image-slideshow";
-  var VERSION = "0.4.0";
+  var VERSION = "0.4.1";
   var ROUTE = "/plugins/image-slideshow";
   var OPTIONS_KEY = "stash.imageSlideshow.options.v1";
   var PENDING_KEY = "stash.imageSlideshow.pending.v1";
