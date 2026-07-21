@@ -1,4 +1,8 @@
-# Native Image Slideshow for Stash
+# Native Image Slideshow for Stash — v0.4.2
+
+**Current plugin version: `v0.4.2`**
+
+A root-level file named `VERSION-v0.4.2` is included so the current version is visible directly in the GitHub file list. On future releases, that filename and this heading should be updated alongside the manifest and package metadata.
 
 A UI-only Stash plugin for clean, configurable image slideshows. It does not modify image metadata or the Stash source tree.
 
@@ -36,6 +40,9 @@ The custom player includes:
 - Volume slider and mute
 - Playback speeds from 0.5x to 2x
 - Repeat-current-track toggle
+- A bottom-right docked layout
+- Collapse and expand controls
+- Dragging by the title bar with viewport-edge clamping
 
 Changing the selected Audio record destroys the previous WaveSurfer instance before loading the new stream. Closing the slideshow destroys the instance, aborts waveform loading, and removes its listeners. If WaveSurfer, waveform fetching, or waveform decoding fails, the same audio element is shown with its native browser controls. Loading, buffering, unsupported-format, autoplay-blocked, and playback-error states appear in the player.
 
@@ -56,6 +63,19 @@ Options persist in the current browser profile.
 Copy this folder to Stash's configured plugins directory, reload plugins, and enable **Native Image Slideshow** in Settings > Plugins if it is not enabled automatically.
 
 The manifest loads the locally vendored WaveSurfer core, Timeline plugin, and Hover plugin before `stash-image-slideshow.js`; no remote CDN is used. The plugin registers `/plugins/image-slideshow` and exposes a browser API at `window.StashImageSlideshow` for other plugins.
+
+## Release-version convention
+
+Every plugin release should update all of the following to the same version:
+
+- `stash-image-slideshow.yml`
+- The `VERSION` constant in `stash-image-slideshow.js`
+- `package.json`
+- `package-lock.json`
+- The README title and current-version line
+- The root marker filename `VERSION-vX.Y.Z`
+
+The runtime filenames remain stable so Stash installations can be updated without leaving obsolete versioned JavaScript or CSS files behind.
 
 ## Development
 
