@@ -1,0 +1,172 @@
+.stash-slideshow-hotkey-settings {
+  margin: 0 1.25rem 1.25rem;
+  padding: 0.9rem;
+  border: 1px solid rgba(158, 145, 255, 0.22);
+  border-radius: 0.65rem;
+  background: #151d2b;
+}
+
+.stash-slideshow-hotkey-heading h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.stash-slideshow-hotkey-heading small {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--text-muted, #a9adba);
+  font-size: 0.74rem;
+}
+
+.stash-slideshow-hotkey-mode {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.8rem;
+  color: #f4f4f7;
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+
+.stash-slideshow-hotkey-mode select {
+  width: 100%;
+  min-width: 0;
+  padding: 0.52rem 0.6rem;
+  border: 1px solid rgba(171, 184, 207, 0.22);
+  border-radius: 0.5rem;
+  color: #f5f7fb;
+  background: #191f2c;
+  color-scheme: dark;
+}
+
+.stash-slideshow-hotkey-summary {
+  display: grid;
+  gap: 0.42rem;
+  margin-top: 0.8rem;
+  padding: 0.75rem;
+  border-radius: 0.55rem;
+  color: #b9c3d3;
+  background: rgba(255, 255, 255, 0.035);
+  font-size: 0.75rem;
+}
+
+.stash-slideshow-hotkey-summary strong {
+  color: #f5f7fb;
+}
+
+.stash-slideshow-hotkey-summary kbd,
+.stash-slideshow-hotkey-binding {
+  border: 1px solid rgba(180, 192, 214, 0.3);
+  border-bottom-color: rgba(180, 192, 214, 0.48);
+  border-radius: 0.35rem;
+  color: #f5f7fb;
+  background: #202b40;
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.32);
+  font: inherit;
+}
+
+.stash-slideshow-hotkey-summary kbd {
+  display: inline-block;
+  min-width: 1.55rem;
+  padding: 0.08rem 0.28rem;
+  text-align: center;
+}
+
+.stash-slideshow-hotkey-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.42rem 0.65rem;
+  margin-top: 0.8rem;
+  align-items: center;
+}
+
+.stash-slideshow-hotkey-group {
+  grid-column: 1 / -1;
+  margin-top: 0.35rem;
+  color: #b6adff;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.stash-slideshow-hotkey-group:first-child {
+  margin-top: 0;
+}
+
+.stash-slideshow-hotkey-row {
+  display: contents;
+}
+
+.stash-slideshow-hotkey-row > span {
+  min-width: 0;
+  color: #c1cad8;
+  font-size: 0.76rem;
+}
+
+.stash-slideshow-hotkey-binding {
+  min-width: 6.5rem;
+  padding: 0.34rem 0.5rem;
+  cursor: pointer;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.stash-slideshow-hotkey-binding:hover,
+.stash-slideshow-hotkey-binding:focus-visible,
+.stash-slideshow-hotkey-binding.is-capturing {
+  border-color: rgba(188, 177, 255, 0.72);
+  background: #293753;
+  outline: none;
+}
+
+.stash-slideshow-hotkey-binding.is-capturing {
+  color: #ded9ff;
+}
+
+.stash-slideshow-hotkey-reset {
+  margin-top: 0.75rem;
+  padding: 0.4rem 0.58rem;
+  border: 1px solid rgba(171, 184, 207, 0.2);
+  border-radius: 0.45rem;
+  color: #c8d0dd;
+  background: #191f2c;
+  font-size: 0.72rem;
+}
+
+.stash-slideshow-hotkey-reset:hover,
+.stash-slideshow-hotkey-reset:focus-visible {
+  border-color: rgba(188, 177, 255, 0.6);
+  color: white;
+  outline: none;
+}
+
+.stash-slideshow-hotkey-status {
+  display: block;
+  min-height: 1rem;
+  margin-top: 0.55rem;
+  color: #aeb8ca;
+  font-size: 0.68rem;
+}
+
+.stash-slideshow-hotkey-status.is-error {
+  color: #ffb5bd;
+}
+
+.stash-slideshow-wave-player:focus-visible {
+  outline: 2px solid rgba(181, 169, 255, 0.82);
+  outline-offset: 2px;
+}
+
+@media (max-width: 560px) {
+  .stash-slideshow-hotkey-settings {
+    margin-right: 0.75rem;
+    margin-left: 0.75rem;
+  }
+
+  .stash-slideshow-hotkey-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(5.4rem, auto);
+  }
+
+  .stash-slideshow-hotkey-binding {
+    min-width: 5.4rem;
+  }
+}
