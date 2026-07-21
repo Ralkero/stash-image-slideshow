@@ -1,8 +1,8 @@
-# Native Image Slideshow for Stash — v0.4.3
+# Native Image Slideshow for Stash — v0.4.4
 
-**Current plugin version: `v0.4.3`**
+**Current plugin version: `v0.4.4`**
 
-A root-level file named `VERSION-v0.4.3` is included so the current version is visible directly in the GitHub file list. On future releases, that filename and this heading should be updated alongside the manifest and package metadata.
+A root-level file named `VERSION-v0.4.4` is included so the current version is visible directly in the GitHub file list. On future releases, that filename and this heading should be updated alongside the manifest and package metadata.
 
 A UI-only Stash plugin for clean, configurable image slideshows. It does not modify image metadata or the Stash source tree.
 
@@ -48,24 +48,28 @@ Changing the selected Audio record destroys the previous WaveSurfer instance bef
 
 Legacy Scene background clips continue to use the existing hidden video element and compact controls. Spectrogram, minimap, regions, and waveform zoom are intentionally not enabled.
 
-### Hotkey modes
+### Hotkey controls
 
-Hotkey settings are available both on the slideshow setup page and inside the live Playback settings panel. They persist in the current browser profile.
+A dedicated, collapsible **Hotkey controls** menu appears on the slideshow setup page. The same menu is also available inside the live Playback settings panel. Settings persist in the current browser profile.
 
-**Linked mode** is the default:
+Separate controls are always available without the linked modifier:
 
-- `Left` / `Right`: previous or next image and rewind or forward the audio by 10 seconds
-- `Space` or `K`: synchronize slideshow and audio play/pause
-- `M`: play or pause audio only
-- `F`: fullscreen
-- `Esc`: close the slideshow after leaving fullscreen
+- `Left` / `Right`: previous or next image
+- `Space` or `K`: slideshow play/pause
+- `J` / `L`: rewind or forward audio by 10 seconds
+- `M`: audio play/pause
 
-**Separate mode** provides independent configurable bindings for:
+Hold the linked modifier with any corresponding slideshow or audio transport key to control both together. The linked modifier defaults to **Shift** and can be changed to Shift, Ctrl, Alt, or Meta in the Hotkey controls menu.
 
-- Slideshow previous image, next image, and play/pause
-- Audio rewind 10 seconds, forward 10 seconds, and play/pause
+Default linked examples:
 
-The default separate bindings are `Left`, `Right`, and `Space` for the slideshow, and `J`, `L`, and `M` for audio. Duplicate assignments are rejected so one key cannot accidentally trigger two separate actions.
+- `Shift + Left` or `Shift + J`: previous image and rewind audio 10 seconds
+- `Shift + Right` or `Shift + L`: next image and forward audio 10 seconds
+- `Shift + Space`, `Shift + K`, or `Shift + M`: synchronize slideshow and audio play/pause
+
+The six separate bindings are individually configurable. Duplicate assignments are rejected, and the selected linked modifier cannot also be embedded in a separate binding.
+
+The existing `F` fullscreen and `Esc` close behavior remains unchanged.
 
 ## Installation
 
