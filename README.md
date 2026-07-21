@@ -1,8 +1,8 @@
-# Native Image Slideshow for Stash — v0.4.2
+# Native Image Slideshow for Stash — v0.4.3
 
-**Current plugin version: `v0.4.2`**
+**Current plugin version: `v0.4.3`**
 
-A root-level file named `VERSION-v0.4.2` is included so the current version is visible directly in the GitHub file list. On future releases, that filename and this heading should be updated alongside the manifest and package metadata.
+A root-level file named `VERSION-v0.4.3` is included so the current version is visible directly in the GitHub file list. On future releases, that filename and this heading should be updated alongside the manifest and package metadata.
 
 A UI-only Stash plugin for clean, configurable image slideshows. It does not modify image metadata or the Stash source tree.
 
@@ -48,15 +48,24 @@ Changing the selected Audio record destroys the previous WaveSurfer instance bef
 
 Legacy Scene background clips continue to use the existing hidden video element and compact controls. Spectrogram, minimap, regions, and waveform zoom are intentionally not enabled.
 
-Keyboard shortcuts while playing:
+### Hotkey modes
 
-- `Left` / `Right`: previous or next image
-- `Space` or `K`: play or pause the image slideshow
-- `M`: play or pause the background clip
+Hotkey settings are available both on the slideshow setup page and inside the live Playback settings panel. They persist in the current browser profile.
+
+**Linked mode** is the default:
+
+- `Left` / `Right`: previous or next image and rewind or forward the audio by 10 seconds
+- `Space` or `K`: synchronize slideshow and audio play/pause
+- `M`: play or pause audio only
 - `F`: fullscreen
 - `Esc`: close the slideshow after leaving fullscreen
 
-Options persist in the current browser profile.
+**Separate mode** provides independent configurable bindings for:
+
+- Slideshow previous image, next image, and play/pause
+- Audio rewind 10 seconds, forward 10 seconds, and play/pause
+
+The default separate bindings are `Left`, `Right`, and `Space` for the slideshow, and `J`, `L`, and `M` for audio. Duplicate assignments are rejected so one key cannot accidentally trigger two separate actions.
 
 ## Installation
 
@@ -69,7 +78,7 @@ The manifest loads the locally vendored WaveSurfer core, Timeline plugin, and Ho
 Every plugin release should update all of the following to the same version:
 
 - `stash-image-slideshow.yml`
-- The `VERSION` constant in `stash-image-slideshow.js`
+- User-visible runtime version constants
 - `package.json`
 - `package-lock.json`
 - The README title and current-version line
