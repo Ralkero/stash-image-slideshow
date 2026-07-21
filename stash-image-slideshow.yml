@@ -1,0 +1,12 @@
+name: Native Image Slideshow
+description: Clean, configurable image slideshows with synchronized WaveSurfer audio playback for Stash.
+version: 0.4.0
+url: https://github.com/Ralkero/stash-image-slideshow
+ui:
+  javascript:
+    - vendor/wavesurfer.min.js
+    - vendor/timeline.min.js
+    - vendor/hover.min.js
+    - stash-image-slideshow.js
+  css:
+    - stash-image-slideshow.css
