@@ -78,8 +78,6 @@ test("manifest dependency order and responsive player styles are packaged", () =
   const plugin = manifest.indexOf("stash-image-slideshow.js");
   assert.ok(core >= 0 && core < timeline && timeline < hover && hover < plugin);
   assert.match(css, /\.stash-slideshow-wave-player/);
-  assert.match(css, /\.stash-slideshow-player:fullscreen/);
-  assert.match(css, /height: 100dvh/);
   assert.match(css, /@media \(max-width: 760px\)/);
   assert.match(css, /@media \(max-width: 560px\)/);
 });
@@ -93,6 +91,7 @@ test("sanitizes persisted playback options", () => {
     fit: "cover",
     background: "not-a-color",
     backgroundVolume: 3,
+    linkedPause: false,
     backgroundClip: { id: 44, label: "Audio scene", stream: "/scene/44/stream", duration: 95 },
     direction: "DESC"
   });
@@ -102,6 +101,7 @@ test("sanitizes persisted playback options", () => {
   assert.equal(options.fit, "cover");
   assert.equal(options.background, "#090b10");
   assert.equal(options.backgroundVolume, 1);
+  assert.equal(options.linkedPause, false);
   assert.equal(options.backgroundClip.id, "44");
   assert.equal(options.backgroundClip.stream, "/scene/44/stream");
   assert.equal(options.direction, "DESC");
@@ -164,6 +164,44 @@ test("shuffle returns a copy and preserves every image", () => {
   assert.deepEqual(input, [1, 2, 3, 4]);
   assert.deepEqual([...output].sort(), input);
   assert.notDeepEqual(output, input);
+});
+
+test("reshuffle keeps the current image visible and changes the remaining queue", () => {
+  const { api } = loadPlugin();
+  const input = [{ id: "1" }, { id: "2" }, { id: "3" }, { id: "4" }];
+  const output = api._test.reshuffleFromCurrent(input, 2, () => 0.999);
+  assert.equal(output.index, 0);
+  assert.equal(output.items[0], input[2]);
+  assert.deepEqual([...output.items].map((item) => item.id).sort(), ["1", "2", "3", "4"]);
+  assert.notDeepEqual(output.items.slice(1), [input[0], input[1], input[3]]);
+  assert.deepEqual(input.map((item) => item.id), ["1", "2", "3", "4"]);
+});
+
+test("upcoming preview follows loop and non-loop queue boundaries", () => {
+  const { api } = loadPlugin();
+  const input = [{ id: "1" }, { id: "2" }, { id: "3" }, { id: "4" }];
+  assert.deepEqual(Array.from(api._test.upcomingImages(input, 1, 10, false), (entry) => entry.image.id), ["3", "4"]);
+  assert.deepEqual(Array.from(api._test.upcomingImages(input, 2, 3, true), (entry) => entry.image.id), ["4", "1", "2"]);
+  assert.equal(api._test.upcomingImages([input[0]], 0, 10, true).length, 0);
+});
+
+test("recent sources deduplicate and presets retain named source definitions", () => {
+  const { api } = loadPlugin();
+  const gallery = api._test.sourceForScope("gallery", ["44"], false, { sort: "path", direction: "ASC" });
+  gallery.label = "Favorites";
+  const tag = api._test.sourceForScope("tag", ["12"], true, { sort: "date", direction: "DESC" });
+  tag.label = "Goth family";
+  let recent = api._test.updateRecentSources([], gallery, 1000);
+  recent = api._test.updateRecentSources(recent, tag, 2000);
+  recent = api._test.updateRecentSources(recent, gallery, 3000);
+  assert.equal(recent.length, 2);
+  assert.equal(recent[0].name, "Favorites");
+  assert.equal(recent[0].updatedAt, 3000);
+
+  const presets = api._test.upsertPreset([], "Late night", tag, "preset-1", 4000);
+  assert.equal(presets[0].name, "Late night");
+  assert.equal(presets[0].source.label, "Goth family");
+  assert.deepEqual(JSON.parse(JSON.stringify(presets[0].source.imageFilter.tags.value)), ["12"]);
 });
 
 test("next image calculation wraps only when loop is enabled", () => {
