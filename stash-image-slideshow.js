@@ -2,10 +2,14 @@
   "use strict";
 
   var PLUGIN_ID = "stash-image-slideshow";
-  var VERSION = "0.4.1";
+  var VERSION = "0.5.1";
   var ROUTE = "/plugins/image-slideshow";
   var OPTIONS_KEY = "stash.imageSlideshow.options.v1";
   var PENDING_KEY = "stash.imageSlideshow.pending.v1";
+  var RECENT_SOURCES_KEY = "stash.imageSlideshow.recentSources.v1";
+  var PRESETS_KEY = "stash.imageSlideshow.presets.v1";
+  var MAX_RECENT_SOURCES = 12;
+  var MAX_PRESETS = 50;
   var React;
   var h;
 
@@ -22,6 +26,7 @@
     backgroundClip: null,
     backgroundVolume: 0.65,
     backgroundLoop: true,
+    linkedPause: true,
     sort: "path",
     direction: "ASC"
   };
@@ -37,6 +42,8 @@
     volume: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4h4l5 4V6L8 10H4Z" fill="currentColor"/><path d="M16 9a4 4 0 0 1 0 6m2-8a7 7 0 0 1 0 10" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
     muted: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4h4l5 4V6L8 10H4Z" fill="currentColor"/><path d="m17 10 4 4m0-4-4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
     repeat: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3l3 3-3 3M4 11V9a3 3 0 0 1 3-3h13M7 21l-3-3 3-3m13-2v2a3 3 0 0 1-3 3H4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><text x="9.1" y="15" fill="currentColor" font-size="7" font-family="sans-serif" font-weight="700">1</text></svg>',
+    link: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.2 13.8a4 4 0 0 0 5.7 0l2.1-2.1A4 4 0 0 0 12.3 6l-1.2 1.2m2.7 3A4 4 0 0 0 8.1 10L6 12.1a4 4 0 0 0 5.7 5.7l1.2-1.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+    shuffle: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 3h5v5M21 3l-6.7 6.7a3 3 0 0 1-2.1.9h-.4a3 3 0 0 1-2.1-.9L3 3m13 18h5v-5m0 5-6.7-6.7a3 3 0 0 0-2.1-.9h-.4a3 3 0 0 0-2.1.9L3 21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     settings: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m19 13.5 1.5 1.2-1.8 3-1.9-.7a8 8 0 0 1-2.3 1.3l-.3 2h-3.5l-.3-2A8 8 0 0 1 8.1 17l-1.9.7-1.8-3L6 13.5a8 8 0 0 1 0-2.7L4.4 9.6l1.8-3 1.9.7A8 8 0 0 1 10.4 6l.3-2h3.5l.3 2a8 8 0 0 1 2.3 1.3l1.9-.7 1.8 3-1.5 1.2a8 8 0 0 1 0 2.7Z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>',
     fullscreen: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
@@ -74,6 +81,7 @@
       backgroundClip: sanitizeBackgroundClip(input.backgroundClip),
       backgroundVolume: clampNumber(input.backgroundVolume, 0, 1, DEFAULT_OPTIONS.backgroundVolume),
       backgroundLoop: input.backgroundLoop === undefined ? DEFAULT_OPTIONS.backgroundLoop : !!input.backgroundLoop,
+      linkedPause: input.linkedPause === undefined ? DEFAULT_OPTIONS.linkedPause : !!input.linkedPause,
       sort: sorts.indexOf(input.sort) !== -1 ? input.sort : DEFAULT_OPTIONS.sort,
       direction: input.direction === "DESC" ? "DESC" : "ASC"
     };
@@ -392,6 +400,128 @@
       findFilter: value.findFilter || value.filter || {},
       label: value.label || "Image slideshow"
     };
+  }
+
+  function sourceSignature(source) {
+    var normalized = normalizeSource(source);
+    return JSON.stringify({
+      kind: normalized.kind,
+      ids: normalized.ids.slice().sort(),
+      imageFilter: normalized.imageFilter,
+      findFilter: normalized.findFilter
+    });
+  }
+
+  function builderSelectionFromSource(source) {
+    var normalized = normalizeSource(source);
+    if (normalized.kind !== "filter" || normalized.ids.length) return null;
+    var filter = normalized.imageFilter || {};
+    var keys = Object.keys(filter);
+    if (!keys.length) return { scope: "all", ids: [], includeDescendants: false };
+    var mappings = [
+      { field: "galleries", scope: "gallery" },
+      { field: "tags", scope: "tag" },
+      { field: "studios", scope: "studio" },
+      { field: "performers", scope: "performer" }
+    ];
+    if (keys.length !== 1) return null;
+    for (var index = 0; index < mappings.length; index += 1) {
+      var mapping = mappings[index];
+      if (keys[0] !== mapping.field) continue;
+      var condition = filter[mapping.field];
+      var values = condition && Array.isArray(condition.value) ? condition.value.map(String).filter(Boolean) : [];
+      if (!values.length || (condition.modifier && condition.modifier !== "INCLUDES")) return null;
+      return {
+        scope: mapping.scope,
+        ids: values,
+        includeDescendants: (mapping.scope === "tag" || mapping.scope === "studio") && Number(condition.depth) === -1
+      };
+    }
+    return null;
+  }
+
+  function sanitizeSourceRecord(value, fallbackName) {
+    if (!value || typeof value !== "object" || !value.source) return null;
+    var source = normalizeSource(value.source);
+    return {
+      id: String(value.id || sourceSignature(source)),
+      name: String(value.name || source.label || fallbackName || "Slideshow source").trim() || "Slideshow source",
+      source: source,
+      updatedAt: clampNumber(value.updatedAt, 0, Number.MAX_SAFE_INTEGER, Date.now())
+    };
+  }
+
+  function updateRecentSources(records, source, now) {
+    var normalized = normalizeSource(source);
+    var signature = sourceSignature(normalized);
+    var next = [{
+      id: signature,
+      name: normalized.label,
+      source: normalized,
+      updatedAt: Number(now) || Date.now()
+    }];
+    (records || []).forEach(function (record) {
+      var clean = sanitizeSourceRecord(record, "Recent source");
+      if (clean && sourceSignature(clean.source) !== signature && next.length < MAX_RECENT_SOURCES) next.push(clean);
+    });
+    return next;
+  }
+
+  function upsertPreset(records, name, source, id, now) {
+    var normalized = normalizeSource(source);
+    var cleanName = String(name || normalized.label || "Slideshow preset").trim() || "Slideshow preset";
+    var presetID = id ? String(id) : "preset-" + (Number(now) || Date.now()).toString(36) + "-" + Math.random().toString(36).slice(2, 8);
+    var next = [{ id: presetID, name: cleanName, source: normalized, updatedAt: Number(now) || Date.now() }];
+    (records || []).forEach(function (record) {
+      var clean = sanitizeSourceRecord(record, "Slideshow preset");
+      if (clean && clean.id !== presetID && next.length < MAX_PRESETS) next.push(clean);
+    });
+    return next;
+  }
+
+  function loadSourceRecords(key, fallbackName, limit) {
+    try {
+      var parsed = JSON.parse(window.localStorage.getItem(key) || "[]");
+      if (!Array.isArray(parsed)) return [];
+      return parsed.map(function (item) { return sanitizeSourceRecord(item, fallbackName); }).filter(Boolean).slice(0, limit);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function saveSourceRecords(key, records) {
+    try { window.localStorage.setItem(key, JSON.stringify(records || [])); } catch (_) {}
+  }
+
+  function upcomingImages(items, currentIndex, limit, loop) {
+    var list = items || [];
+    var output = [];
+    if (list.length < 2) return output;
+    var maximum = Math.min(Math.max(0, Number(limit) || 0), loop ? list.length - 1 : Math.max(0, list.length - currentIndex - 1));
+    for (var offset = 1; offset <= maximum; offset += 1) {
+      var target = currentIndex + offset;
+      if (target >= list.length) {
+        if (!loop) break;
+        target %= list.length;
+      }
+      output.push({ index: target, image: list[target] });
+    }
+    return output;
+  }
+
+  function reshuffleFromCurrent(items, currentIndex, random) {
+    var list = (items || []).slice();
+    if (!list.length) return { items: [], index: 0 };
+    var safeIndex = clampNumber(currentIndex, 0, list.length - 1, 0);
+    var current = list[safeIndex];
+    var rest = list.filter(function (_item, index) { return index !== safeIndex; });
+    var shuffled = shuffledCopy(rest, random);
+    if (shuffled.length > 1 && shuffled.every(function (item, index) { return item === rest[index]; })) {
+      var first = shuffled[0];
+      shuffled[0] = shuffled[1];
+      shuffled[1] = first;
+    }
+    return { items: [current].concat(shuffled), index: 0 };
   }
 
   var IMAGE_QUERY = [
@@ -786,7 +916,12 @@
   }
 
   function Player(props) {
-    var images = props.images;
+    var queueState = React.useState(props.images);
+    var images = queueState[0];
+    var setImages = queueState[1];
+    var queueRevisionState = React.useState(0);
+    var queueRevision = queueRevisionState[0];
+    var setQueueRevision = queueRevisionState[1];
     var optionsState = React.useState(props.options);
     var options = optionsState[0];
     var setOptions = optionsState[1];
@@ -803,6 +938,9 @@
     var settingsState = React.useState(false);
     var settingsOpen = settingsState[0];
     var setSettingsOpen = settingsState[1];
+    var queuePreviewState = React.useState(false);
+    var queuePreviewOpen = queuePreviewState[0];
+    var setQueuePreviewOpen = queuePreviewState[1];
     var rootRef = React.useRef(null);
     var mediaRef = React.useRef(null);
     var waveformContainerRef = React.useRef(null);
@@ -859,6 +997,32 @@
         phase: "loading",
         token: transitionToken.current
       });
+    }
+
+    function jumpTo(target) {
+      if (transition || target === index || target < 0 || target >= images.length) return;
+      if (options.transition === "none" || options.transitionSeconds <= 0) {
+        setIndex(target);
+        return;
+      }
+      transitionToken.current += 1;
+      setTransition({
+        from: index,
+        to: target,
+        direction: target < index ? "backward" : "forward",
+        phase: "loading",
+        token: transitionToken.current
+      });
+    }
+
+    function reshuffleQueue() {
+      var visibleIndex = transition ? transition.to : index;
+      var result = reshuffleFromCurrent(images, visibleIndex);
+      transitionToken.current += 1;
+      setTransition(null);
+      setImages(result.items);
+      setIndex(result.index);
+      setQueueRevision(function (value) { return value + 1; });
     }
 
     function beginTransition(token) {
@@ -953,6 +1117,18 @@
       media.loop = options.backgroundLoop;
       media.playbackRate = mediaRate;
     }, [options.backgroundVolume, options.backgroundLoop, mediaMuted, mediaRate]);
+
+    React.useEffect(function () {
+      var clip = options.backgroundClip;
+      var media = mediaRef.current;
+      if (!media || !clip || clip.kind !== "audio" || !options.linkedPause) return;
+      if (playing && media.paused) {
+        var playResult = media.play();
+        if (playResult && typeof playResult.catch === "function") playResult.catch(recordPlaybackFailure);
+      } else if (!playing && !media.paused) {
+        media.pause();
+      }
+    }, [playing, options.linkedPause, options.backgroundClip && options.backgroundClip.kind, options.backgroundClip && options.backgroundClip.id]);
 
     React.useEffect(function () {
       function keydown(event) {
@@ -1054,6 +1230,10 @@
       commitOptions(sanitizeOptions(Object.assign({}, options, { backgroundLoop: !options.backgroundLoop })));
     }
 
+    function toggleLinkedPause() {
+      commitOptions(sanitizeOptions(Object.assign({}, options, { linkedPause: !options.linkedPause })));
+    }
+
     var displayIndex = transition ? transition.to : index;
     current = images[displayIndex];
     var fitClass = options.fit === "native" ? "fit-native" : "fit-" + options.fit;
@@ -1067,6 +1247,7 @@
     var isAudioBackground = !!(backgroundClip && backgroundClip.kind === "audio");
     var waveformFallback = isAudioBackground && ["fallback", "unsupported", "error"].indexOf(waveformStatus.kind) !== -1;
     var waveformMessage = playbackError || (mediaBlocked ? "Press play once to allow background audio." : waveformStatus.message);
+    var upcoming = upcomingImages(images, displayIndex, 10, options.loop);
     var mediaElement = backgroundClip ? h(isAudioBackground ? "audio" : "video", {
       ref: mediaRef,
       className: "stash-slideshow-background-media" + (isAudioBackground && waveformFallback ? " is-native-fallback" : ""),
@@ -1076,15 +1257,15 @@
       controls: isAudioBackground && waveformFallback,
       loop: options.backgroundLoop,
       muted: mediaMuted || options.backgroundVolume <= 0,
-      onPlay: function () { setMediaPlaying(true); setMediaBlocked(false); setPlaybackError(""); },
-      onPause: function () { setMediaPlaying(false); },
+      onPlay: function () { setMediaPlaying(true); setMediaBlocked(false); setPlaybackError(""); if (isAudioBackground && options.linkedPause) setPlaying(true); },
+      onPause: function () { setMediaPlaying(false); if (isAudioBackground && options.linkedPause) setPlaying(false); },
       onTimeUpdate: function (event) { setMediaTime(event.currentTarget.currentTime || 0); },
       onLoadedMetadata: function (event) { setMediaDuration(event.currentTarget.duration || backgroundClip.duration || 0); },
       onDurationChange: function (event) { setMediaDuration(event.currentTarget.duration || backgroundClip.duration || 0); },
       onVolumeChange: function (event) { setMediaMuted(event.currentTarget.muted); },
       onRateChange: function (event) { setMediaRate(event.currentTarget.playbackRate || 1); },
       onError: handleMediaError,
-      onEnded: function () { setMediaPlaying(false); }
+      onEnded: function () { setMediaPlaying(false); if (isAudioBackground && options.linkedPause) setPlaying(false); }
     }) : null;
 
     return h("div", {
@@ -1142,6 +1323,7 @@
         h("button", { type: "button", onClick: function () { move(-1); }, title: "Previous (Left arrow)" }, icon("previous")),
         h("button", { type: "button", className: "primary", onClick: function () { setPlaying(!playing); }, title: playing ? "Pause (Space)" : "Play (Space)" }, icon(playing ? "pause" : "play")),
         h("button", { type: "button", onClick: function () { move(1); }, title: "Next (Right arrow)" }, icon("next")),
+        h("button", { type: "button", onClick: reshuffleQueue, title: "Reshuffle upcoming images", "aria-label": "Reshuffle slideshow queue" }, icon("shuffle")),
         h("span", { className: "stash-slideshow-counter" }, (displayIndex + 1) + " / " + images.length)
       ),
       isAudioBackground ? h("section", { className: "stash-slideshow-wave-player is-" + waveformStatus.kind + (waveformFallback && waveformStatus.kind !== "fallback" ? " is-fallback" : ""), "aria-label": "Background audio player" },
@@ -1176,8 +1358,12 @@
               [0.5, 0.75, 1, 1.25, 1.5, 2].map(function (rate) { return h("option", { key: rate, value: String(rate) }, rate + "×"); })
             )
           ),
+          h("button", { type: "button", className: "stash-slideshow-wave-link" + (options.linkedPause ? " active" : ""), onClick: toggleLinkedPause, title: options.linkedPause ? "Disable linked slideshow and audio pausing" : "Link slideshow and audio pausing", "aria-label": "Linked slideshow and audio pausing", "aria-pressed": options.linkedPause }, icon("link")),
           h("button", { type: "button", className: "stash-slideshow-wave-repeat" + (options.backgroundLoop ? " active" : ""), onClick: toggleBackgroundRepeat, title: options.backgroundLoop ? "Disable repeat current track" : "Repeat current track", "aria-label": "Repeat current track", "aria-pressed": options.backgroundLoop }, icon("repeat"))
-        ) : h("div", { className: "stash-slideshow-native-fallback-note" }, "The same audio element is still active through the browser controls above.")
+        ) : h("div", { className: "stash-slideshow-native-fallback-note" },
+          h("span", null, "The same audio element is still active through the browser controls above."),
+          h("button", { type: "button", className: options.linkedPause ? "active" : "", onClick: toggleLinkedPause, title: options.linkedPause ? "Disable linked slideshow and audio pausing" : "Link slideshow and audio pausing", "aria-label": "Linked slideshow and audio pausing", "aria-pressed": options.linkedPause }, icon("link"), h("span", null, "Linked pause"))
+        )
       ) : backgroundClip ? h("div", { className: "stash-slideshow-audio-control" + (mediaBlocked ? " is-blocked" : "") },
         h("button", { type: "button", onClick: toggleBackgroundMedia, title: mediaPlaying ? "Pause background clip (M)" : "Play background clip (M)", "aria-label": mediaPlaying ? "Pause background clip" : "Play background clip" }, icon(mediaPlaying ? "pause" : "play")),
         h("div", { className: "stash-slideshow-audio-control-copy" },
@@ -1194,7 +1380,18 @@
         ),
         h("span", { className: "stash-slideshow-audio-time" }, formatMediaTime(mediaTime), " / ", formatMediaTime(mediaDuration || backgroundClip.duration))
       ) : null,
-      playing ? h("div", { key: index + ":" + options.displaySeconds, className: "stash-slideshow-progress", style: { animationDuration: options.displaySeconds + "s" } }) : null,
+      upcoming.length ? h("section", { className: "stash-slideshow-queue-preview" + (queuePreviewOpen ? " is-open" : ""), "aria-label": "Upcoming slideshow images" },
+        h("button", { type: "button", className: "stash-slideshow-queue-handle", onClick: function () { setQueuePreviewOpen(!queuePreviewOpen); }, "aria-expanded": queuePreviewOpen, title: "Preview upcoming images" }, icon("next"), h("span", null, "Up next"), h("small", null, upcoming.length)),
+        h("div", { className: "stash-slideshow-queue-thumbnails" }, upcoming.map(function (entry, previewIndex) {
+          var image = entry.image;
+          var imageTitle = image.title || (image.galleries && image.galleries[0] && image.galleries[0].title) || "Image " + image.id;
+          return h("button", { key: image.id + ":" + entry.index, type: "button", onClick: function () { setQueuePreviewOpen(false); jumpTo(entry.index); }, title: "Show next image " + (previewIndex + 1) + ": " + imageTitle },
+            h("img", { src: image.paths.thumbnail || image.paths.image, alt: imageTitle, loading: "lazy", draggable: false }),
+            h("span", null, previewIndex + 1)
+          );
+        }))
+      ) : null,
+      playing ? h("div", { key: queueRevision + ":" + index + ":" + options.displaySeconds, className: "stash-slideshow-progress", style: { animationDuration: options.displaySeconds + "s" } }) : null,
       settingsOpen ? h("aside", { className: "stash-slideshow-live-settings" },
         h("div", { className: "stash-slideshow-live-settings-head" }, h("h2", null, "Playback"), h("button", { type: "button", onClick: function () { setSettingsOpen(false); } }, icon("close"))),
         h(OptionsPanel, { options: options, onChange: commitOptions, showOrdering: false }),
@@ -1251,6 +1448,24 @@
     var busyState = React.useState(false);
     var busy = busyState[0];
     var setBusy = busyState[1];
+    var recentState = React.useState(function () { return loadSourceRecords(RECENT_SOURCES_KEY, "Recent source", MAX_RECENT_SOURCES); });
+    var recentSources = recentState[0];
+    var setRecentSources = recentState[1];
+    var presetsState = React.useState(function () { return loadSourceRecords(PRESETS_KEY, "Slideshow preset", MAX_PRESETS); });
+    var presets = presetsState[0];
+    var setPresets = presetsState[1];
+    var presetNameState = React.useState("");
+    var presetName = presetNameState[0];
+    var setPresetName = presetNameState[1];
+    var storedSourceState = React.useState(null);
+    var selectedStoredSource = storedSourceState[0];
+    var setSelectedStoredSource = storedSourceState[1];
+    var editingPresetState = React.useState(null);
+    var editingPresetID = editingPresetState[0];
+    var setEditingPresetID = editingPresetState[1];
+    var editPresetNameState = React.useState("");
+    var editPresetName = editPresetNameState[0];
+    var setEditPresetName = editPresetNameState[1];
 
     function commitOptions(next) {
       setOptions(next);
@@ -1269,6 +1484,11 @@
         if (!loadedImages.length) throw new Error("No images match this slideshow source.");
         var shouldShuffle = options.shuffle || options.sort === "random";
         setImages(shouldShuffle ? shuffledCopy(loadedImages) : loadedImages);
+        setRecentSources(function (current) {
+          var next = updateRecentSources(current, normalized);
+          saveSourceRecords(RECENT_SOURCES_KEY, next);
+          return next;
+        });
         setStatus("");
       }).catch(function (reason) {
         setError(reason.message || String(reason));
@@ -1306,6 +1526,7 @@
     var selectedIDs = selected[scope] || [];
 
     function toggle(id) {
+      setSelectedStoredSource(null);
       setSelected(function (current) {
         var list = current[scope] || [];
         var next = list.indexOf(id) === -1 ? list.concat([id]) : list.filter(function (value) { return value !== id; });
@@ -1323,10 +1544,97 @@
       return names[0] + " + " + (names.length - 1) + " more";
     }
 
-    function startBuilderSource() {
+    function currentBuilderSource() {
+      if (scope === "recent" || (scope !== "all" && !selectedIDs.length)) return null;
       var source = sourceForScope(scope, selectedIDs, includeDescendants, options);
       source.label = selectedLabel();
-      start(source);
+      return source;
+    }
+
+    function startSelectedSource() {
+      var source = selectedStoredSource ? selectedStoredSource.source : currentBuilderSource();
+      if (source) start(source);
+    }
+
+    function savePreset(source, name) {
+      if (!source) return;
+      setPresets(function (current) {
+        var next = upsertPreset(current, name, source);
+        saveSourceRecords(PRESETS_KEY, next);
+        return next;
+      });
+      setPresetName("");
+    }
+
+    function saveBuilderPreset() {
+      var source = currentBuilderSource();
+      if (source) savePreset(source, presetName || source.label);
+    }
+
+    function selectStoredSource(origin, record) {
+      setSelectedStoredSource({ origin: origin, id: record.id, name: record.name, source: normalizeSource(record.source) });
+      setEditingPresetID(null);
+      setEditPresetName("");
+      setError("");
+      setStatus(record.name + " selected. Press Start slideshow when ready.");
+    }
+
+    function beginPresetEdit(preset) {
+      var builderSelection = builderSelectionFromSource(preset.source);
+      setEditingPresetID(preset.id);
+      setEditPresetName(preset.name);
+      setSearch("");
+      setError("");
+      if (!builderSelection) {
+        setScope("recent");
+        setSelectedStoredSource({ origin: "preset", id: preset.id, name: preset.name, source: normalizeSource(preset.source) });
+        setStatus("This filtered preset can be renamed here. Choose another source category to replace its saved source.");
+        return;
+      }
+      setScope(builderSelection.scope);
+      setIncludeDescendants(builderSelection.includeDescendants);
+      setSelected(function (current) {
+        var output = Object.assign({}, current);
+        if (builderSelection.scope !== "all") output[builderSelection.scope] = builderSelection.ids;
+        return output;
+      });
+      setSelectedStoredSource(null);
+      setStatus("Editing " + preset.name + ". Adjust the source selection, then save changes.");
+    }
+
+    function savePresetChanges(preset) {
+      var replacement = currentBuilderSource();
+      var source = replacement || (scope === "recent" ? preset.source : null);
+      if (!source) return;
+      var updatedName = String(editPresetName || preset.name).trim() || preset.name;
+      setPresets(function (current) {
+        var next = upsertPreset(current, updatedName, source, preset.id);
+        saveSourceRecords(PRESETS_KEY, next);
+        return next;
+      });
+      setSelectedStoredSource({ origin: "preset", id: preset.id, name: updatedName, source: normalizeSource(source) });
+      setEditingPresetID(null);
+      setEditPresetName("");
+      setStatus(updatedName + " updated and selected. Press Start slideshow when ready.");
+    }
+
+    function removePreset(id) {
+      if (selectedStoredSource && selectedStoredSource.origin === "preset" && selectedStoredSource.id === id) setSelectedStoredSource(null);
+      if (editingPresetID === id) {
+        setEditingPresetID(null);
+        setEditPresetName("");
+      }
+      setPresets(function (current) {
+        var next = current.filter(function (preset) { return preset.id !== id; });
+        saveSourceRecords(PRESETS_KEY, next);
+        return next;
+      });
+    }
+
+    function clearRecentSources() {
+      if (selectedStoredSource && selectedStoredSource.origin === "recent") setSelectedStoredSource(null);
+      setRecentSources([]);
+      saveSourceRecords(RECENT_SOURCES_KEY, []);
     }
 
     var scopes = [
@@ -1334,6 +1642,7 @@
       { key: "tag", label: "Tag families" },
       { key: "studio", label: "Studios" },
       { key: "performer", label: "Performers" },
+      { key: "recent", label: "Recently Selected" },
       { key: "all", label: "All images" }
     ];
 
@@ -1345,12 +1654,53 @@
       error ? h("div", { className: "stash-slideshow-alert" }, error) : null,
       h("div", { className: "stash-slideshow-builder" },
         h("section", { className: "stash-slideshow-card stash-slideshow-source" },
-          h("div", { className: "stash-slideshow-section-head" }, h("div", null, h("span", { className: "eyebrow" }, "1 · Choose images"), h("h2", null, "Slideshow source")), selectedIDs.length ? h("button", { type: "button", className: "minimal", onClick: function () { setSelected(function (current) { var output = Object.assign({}, current); output[scope] = []; return output; }); } }, "Clear") : null),
+          h("div", { className: "stash-slideshow-section-head" }, h("div", null, h("span", { className: "eyebrow" }, "1 · Choose images"), h("h2", null, "Slideshow source")), scope === "recent" && recentSources.length ? h("button", { type: "button", className: "minimal", onClick: clearRecentSources }, "Clear history") : selectedIDs.length ? h("button", { type: "button", className: "minimal", onClick: function () { setSelectedStoredSource(null); setSelected(function (current) { var output = Object.assign({}, current); output[scope] = []; return output; }); } }, "Clear") : null),
+          h("section", { className: "stash-slideshow-presets", "aria-label": "Slideshow source presets" },
+            h("div", { className: "stash-slideshow-presets-head" },
+              h("div", null, h("strong", null, "Source presets"), h("small", null, "Select a saved source, then use the main Start slideshow button.")),
+              presets.length ? h("span", null, presets.length.toLocaleString()) : null
+            ),
+            h("div", { className: "stash-slideshow-preset-save" },
+              h("input", { type: "text", value: presetName, maxLength: 80, placeholder: scope === "recent" ? "Choose a source category to save" : "Preset name (optional)", disabled: scope === "recent", onChange: function (event) { setPresetName(event.target.value); }, onKeyDown: function (event) { if (event.key === "Enter" && scope !== "recent" && (scope === "all" || selectedIDs.length)) saveBuilderPreset(); } }),
+              h("button", { type: "button", disabled: scope === "recent" || (scope !== "all" && !selectedIDs.length), onClick: saveBuilderPreset }, "Save current source")
+            ),
+            presets.length ? h("div", { className: "stash-slideshow-preset-list" }, presets.map(function (preset) {
+              var isSelected = !!(selectedStoredSource && selectedStoredSource.origin === "preset" && selectedStoredSource.id === preset.id);
+              var isEditing = editingPresetID === preset.id;
+              var editCanSave = scope === "recent" || !!currentBuilderSource();
+              return h("div", { className: "stash-slideshow-preset" + (isSelected ? " is-selected" : "") + (isEditing ? " is-editing" : ""), key: preset.id },
+                h("div", { className: "stash-slideshow-preset-row" },
+                  h("button", { type: "button", className: "stash-slideshow-preset-select", onClick: function () { selectStoredSource("preset", preset); }, title: "Select " + preset.name, "aria-pressed": isSelected }, h("strong", null, preset.name), h("small", null, preset.source.label)),
+                  h("button", { type: "button", className: "stash-slideshow-preset-edit" + (isEditing ? " active" : ""), onClick: function () { if (isEditing) { setEditingPresetID(null); setEditPresetName(""); } else beginPresetEdit(preset); }, title: isEditing ? "Exit preset editing" : "Edit " + preset.name, "aria-pressed": isEditing }, isEditing ? "Done" : "Edit"),
+                  h("button", { type: "button", className: "stash-slideshow-preset-remove", onClick: function () { removePreset(preset.id); }, title: "Delete " + preset.name, "aria-label": "Delete preset " + preset.name }, "×")
+                ),
+                isEditing ? h("div", { className: "stash-slideshow-preset-editor" },
+                  h("label", null, h("span", null, "Preset name"), h("input", { type: "text", value: editPresetName, maxLength: 80, onChange: function (event) { setEditPresetName(event.target.value); } })),
+                  h("small", null, scope === "recent" ? "The original filtered source will be preserved unless you choose a source category." : "The currently selected " + scope + " source will replace this preset when saved."),
+                  h("div", { className: "stash-slideshow-preset-editor-actions" },
+                    h("button", { type: "button", className: "minimal", onClick: function () { setEditingPresetID(null); setEditPresetName(""); } }, "Cancel"),
+                    h("button", { type: "button", disabled: !editCanSave, onClick: function () { savePresetChanges(preset); } }, "Save changes")
+                  )
+                ) : null
+              );
+            })) : null
+          ),
           h("div", { className: "stash-slideshow-tabs", role: "tablist" }, scopes.map(function (item) {
-            return h("button", { key: item.key, type: "button", role: "tab", "aria-selected": scope === item.key, className: scope === item.key ? "active" : "", onClick: function () { setScope(item.key); setSearch(""); } }, item.label);
+            return h("button", { key: item.key, type: "button", role: "tab", "aria-selected": scope === item.key, className: scope === item.key ? "active" : "", onClick: function () { setScope(item.key); setSearch(""); setSelectedStoredSource(null); } }, item.label);
           })),
-          scope === "all" ? h("div", { className: "stash-slideshow-all-source" }, icon("slideshow"), h("h3", null, "Your complete image library"), h("p", null, "Stash will load all matching image records in batches before playback begins.")) : h(React.Fragment, null,
-            (scope === "tag" || scope === "studio") ? h("label", { className: "stash-slideshow-descendants" }, h("input", { type: "checkbox", checked: includeDescendants, onChange: function (event) { setIncludeDescendants(event.target.checked); } }), h("span", null, scope === "tag" ? "Include images from child tags" : "Include child studios")) : null,
+          scope === "recent" ? h("div", { className: "stash-slideshow-quick-sources" },
+            recentSources.length ? recentSources.map(function (recent) {
+              var recentSelected = !!(selectedStoredSource && selectedStoredSource.origin === "recent" && selectedStoredSource.id === recent.id);
+              return h("article", { className: "stash-slideshow-quick-source" + (recentSelected ? " is-selected" : ""), key: recent.id },
+                h("button", { type: "button", className: "stash-slideshow-quick-select", onClick: function () { selectStoredSource("recent", recent); }, "aria-pressed": recentSelected },
+                  h("strong", null, recent.name),
+                  h("small", null, "Last used " + new Date(recent.updatedAt).toLocaleString())
+                ),
+                h("button", { type: "button", className: "stash-slideshow-quick-save", onClick: function () { savePreset(recent.source, recent.name); } }, "Save preset")
+              );
+            }) : h("div", { className: "stash-slideshow-empty" }, "Sources you start will appear here for quick reuse.")
+          ) : scope === "all" ? h("div", { className: "stash-slideshow-all-source" }, icon("slideshow"), h("h3", null, "Your complete image library"), h("p", null, "Stash will load all matching image records in batches before playback begins.")) : h(React.Fragment, null,
+            (scope === "tag" || scope === "studio") ? h("label", { className: "stash-slideshow-descendants" }, h("input", { type: "checkbox", checked: includeDescendants, onChange: function (event) { setSelectedStoredSource(null); setIncludeDescendants(event.target.checked); } }), h("span", null, scope === "tag" ? "Include images from child tags" : "Include child studios")) : null,
             h("div", { className: "stash-slideshow-source-tools" },
               h("input", { className: "stash-slideshow-search", type: "search", placeholder: "Search " + scopes.find(function (item) { return item.key === scope; }).label.toLowerCase(), value: search, onChange: function (event) { setSearch(event.target.value); } }),
               h("select", { className: "stash-slideshow-source-sort", value: sourceSort, onChange: function (event) { setSourceSort(event.target.value); }, "aria-label": "Sort slideshow sources" },
@@ -1379,7 +1729,8 @@
           h("div", { className: "stash-slideshow-section-head" }, h("div", null, h("span", { className: "eyebrow" }, "2 · Customize"), h("h2", null, "Playback options")), h("button", { type: "button", className: "minimal", onClick: function () { commitOptions(sanitizeOptions({})); } }, "Reset")),
           h(OptionsPanel, { options: options, onChange: commitOptions, showOrdering: true }),
           h(BackgroundClipSetup, { options: options, onChange: commitOptions }),
-          h("button", { type: "button", className: "stash-slideshow-start", disabled: busy || (scope !== "all" && !selectedIDs.length), onClick: startBuilderSource }, busy ? status || "Loading…" : "Start slideshow"),
+          selectedStoredSource ? h("div", { className: "stash-slideshow-selected-source" }, h("span", null, "Selected source"), h("strong", null, selectedStoredSource.name)) : null,
+          h("button", { type: "button", className: "stash-slideshow-start", disabled: busy || (!selectedStoredSource && !currentBuilderSource()), onClick: startSelectedSource }, busy ? status || "Loading…" : "Start slideshow"),
           status && !busy ? h("p", { className: "stash-slideshow-status" }, status) : null
         )
       )
@@ -1438,7 +1789,13 @@
         galleryLabel: galleryLabel,
         sourceForScope: sourceForScope,
         normalizeSource: normalizeSource,
+        sourceSignature: sourceSignature,
+        builderSelectionFromSource: builderSelectionFromSource,
+        updateRecentSources: updateRecentSources,
+        upsertPreset: upsertPreset,
         shuffledCopy: shuffledCopy,
+        reshuffleFromCurrent: reshuffleFromCurrent,
+        upcomingImages: upcomingImages,
         sourceFromCurrentList: sourceFromCurrentList,
         nextIndex: nextIndex,
         sanitizeBackgroundClip: sanitizeBackgroundClip,

@@ -19,8 +19,13 @@ Because the Images-page operation reuses Stash's active GraphQL filter, it works
 - Custom background color
 - Sort order and direction
 - Source-picker sorting by name or image count; empty galleries, tags, studios, and performers are hidden
+- A **Recently Selected** source category keeps the 12 most recently started source selections for quick reuse
+- Named source presets restore saved gallery, tag-family, studio, performer, full-library, or filtered-image selections; playback begins only from the main **Start slideshow** button
+- Each preset has an edit mode for renaming it or replacing its source selection without recreating the preset
 - Shuffle, continuous loop, captions, and next-image preloading
-- Fullscreen support with dynamic viewport reflow on desktop and mobile
+- A dedicated in-player reshuffle button keeps the current image visible and randomizes the remaining queue
+- Hovering **Up next** at the bottom of the player reveals up to 10 upcoming thumbnails; select one to jump directly to it
+- Fullscreen support
 - Optional native Audio record or legacy Scene video as the background clip
 
 ### Background audio player
@@ -36,6 +41,7 @@ The custom player includes:
 - Volume slider and mute
 - Playback speeds from 0.5x to 2x
 - Repeat-current-track toggle
+- Linked-pause toggle. When enabled, play/pause from either the audio player or slideshow controls keeps both timelines synchronized
 
 Changing the selected Audio record destroys the previous WaveSurfer instance before loading the new stream. Closing the slideshow destroys the instance, aborts waveform loading, and removes its listeners. If WaveSurfer, waveform fetching, or waveform decoding fails, the same audio element is shown with its native browser controls. Loading, buffering, unsupported-format, autoplay-blocked, and playback-error states appear in the player.
 
@@ -49,7 +55,7 @@ Keyboard shortcuts while playing:
 - `F`: fullscreen
 - `Esc`: close the slideshow after leaving fullscreen
 
-Options persist in the current browser profile.
+Options, recently selected sources, and presets persist in the current browser profile. Recents keep the latest 12 unique source definitions and presets are capped at 50. They do not modify Stash metadata or its database.
 
 ## Installation
 
