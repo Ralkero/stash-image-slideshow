@@ -130,7 +130,6 @@
 
 .stash-slideshow-presets-head,
 .stash-slideshow-preset-save,
-.stash-slideshow-preset,
 .stash-slideshow-quick-source {
   display: flex;
   align-items: center;
@@ -194,13 +193,30 @@
 
 .stash-slideshow-preset {
   min-width: min(15rem, 75vw);
-  padding: 0.12rem 0.2rem 0.12rem 0;
+  padding: 0.12rem 0.2rem;
   border: 1px solid var(--ss-border);
   border-radius: 0.58rem;
   background: rgba(0, 0, 0, 0.14);
 }
 
-.stash-slideshow-preset-start {
+.stash-slideshow-preset.is-selected,
+.stash-slideshow-quick-source.is-selected {
+  border-color: rgba(158, 145, 255, 0.7);
+  background: rgba(124, 109, 242, 0.17);
+  box-shadow: inset 0 0 0 1px rgba(158, 145, 255, 0.18);
+}
+
+.stash-slideshow-preset.is-editing {
+  min-width: min(22rem, 86vw);
+}
+
+.stash-slideshow-preset-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.stash-slideshow-preset-select {
   min-width: 0;
   flex: 1;
   padding: 0.42rem 0.55rem;
@@ -210,12 +226,28 @@
   text-align: left;
 }
 
-.stash-slideshow-preset-start strong,
-.stash-slideshow-preset-start small {
+.stash-slideshow-preset-select strong,
+.stash-slideshow-preset-select small {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.stash-slideshow-preset-edit {
+  flex: 0 0 auto;
+  padding: 0.36rem 0.5rem;
+  border: 1px solid rgba(158, 145, 255, 0.25);
+  border-radius: 0.42rem;
+  color: #d9d4ff;
+  background: rgba(124, 109, 242, 0.12);
+  font-size: 0.7rem;
+}
+
+.stash-slideshow-preset-edit:hover,
+.stash-slideshow-preset-edit.active {
+  border-color: rgba(158, 145, 255, 0.58);
+  background: rgba(124, 109, 242, 0.28);
 }
 
 .stash-slideshow-preset-remove {
@@ -232,6 +264,58 @@
 .stash-slideshow-preset-remove:hover {
   color: #ffd5d9;
   background: rgba(161, 35, 52, 0.25);
+}
+
+.stash-slideshow-preset-editor {
+  margin: 0.2rem 0.35rem 0.35rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.stash-slideshow-preset-editor label,
+.stash-slideshow-preset-editor label span {
+  display: block;
+}
+
+.stash-slideshow-preset-editor label span {
+  margin-bottom: 0.28rem;
+  color: var(--text-muted, #a9adba);
+  font-size: 0.7rem;
+  font-weight: 650;
+}
+
+.stash-slideshow-preset-editor input {
+  width: 100%;
+  padding: 0.5rem 0.58rem;
+  border: 1px solid var(--ss-border);
+  border-radius: 0.48rem;
+  color: inherit;
+  background: #191f2c;
+}
+
+.stash-slideshow-preset-editor > small {
+  display: block;
+  margin-top: 0.42rem;
+  line-height: 1.35;
+}
+
+.stash-slideshow-preset-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.45rem;
+  margin-top: 0.6rem;
+}
+
+.stash-slideshow-preset-editor-actions button {
+  padding: 0.42rem 0.62rem;
+  border: 1px solid rgba(158, 145, 255, 0.32);
+  border-radius: 0.48rem;
+  color: #f4f4f7;
+  background: rgba(124, 109, 242, 0.24);
+}
+
+.stash-slideshow-preset-editor-actions button:disabled {
+  opacity: 0.45;
 }
 
 .stash-slideshow-quick-sources {
@@ -251,7 +335,7 @@
   background: rgba(255, 255, 255, 0.035);
 }
 
-.stash-slideshow-quick-start {
+.stash-slideshow-quick-select {
   min-width: 0;
   flex: 1;
   padding: 0.3rem;
@@ -261,8 +345,8 @@
   text-align: left;
 }
 
-.stash-slideshow-quick-start strong,
-.stash-slideshow-quick-start small {
+.stash-slideshow-quick-select strong,
+.stash-slideshow-quick-select small {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -713,6 +797,27 @@
   background: linear-gradient(135deg, var(--ss-accent), #5e4dda);
   box-shadow: 0 8px 24px rgba(91, 75, 216, 0.26);
   font-weight: 700;
+}
+
+.stash-slideshow-selected-source {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+  margin: 0 1.25rem 0.65rem;
+  padding: 0.62rem 0.75rem;
+  border: 1px solid rgba(158, 145, 255, 0.35);
+  border-radius: 0.62rem;
+  color: var(--text-muted, #a9adba);
+  background: rgba(124, 109, 242, 0.11);
+  font-size: 0.76rem;
+}
+
+.stash-slideshow-selected-source strong {
+  overflow: hidden;
+  color: var(--text-color, #f4f4f7);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .stash-slideshow-start:disabled {

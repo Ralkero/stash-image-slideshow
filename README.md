@@ -20,7 +20,8 @@ Because the Images-page operation reuses Stash's active GraphQL filter, it works
 - Sort order and direction
 - Source-picker sorting by name or image count; empty galleries, tags, studios, and performers are hidden
 - A **Recently Selected** source category keeps the 12 most recently started source selections for quick reuse
-- Named source presets provide one-click playback of saved gallery, tag-family, studio, performer, full-library, or filtered-image selections
+- Named source presets restore saved gallery, tag-family, studio, performer, full-library, or filtered-image selections; playback begins only from the main **Start slideshow** button
+- Each preset has an edit mode for renaming it or replacing its source selection without recreating the preset
 - Shuffle, continuous loop, captions, and next-image preloading
 - A dedicated in-player reshuffle button keeps the current image visible and randomizes the remaining queue
 - Hovering **Up next** at the bottom of the player reveals up to 10 upcoming thumbnails; select one to jump directly to it

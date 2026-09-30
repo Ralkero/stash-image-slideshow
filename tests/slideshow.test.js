@@ -204,6 +204,28 @@ test("recent sources deduplicate and presets retain named source definitions", (
   assert.deepEqual(JSON.parse(JSON.stringify(presets[0].source.imageFilter.tags.value)), ["12"]);
 });
 
+test("restores editable builder selections from compatible preset sources", () => {
+  const { api } = loadPlugin();
+  const gallery = api._test.sourceForScope("gallery", ["44", "45"], false, { sort: "path", direction: "ASC" });
+  assert.deepEqual(JSON.parse(JSON.stringify(api._test.builderSelectionFromSource(gallery))), {
+    scope: "gallery",
+    ids: ["44", "45"],
+    includeDescendants: false
+  });
+
+  const tag = api._test.sourceForScope("tag", ["12"], true, { sort: "date", direction: "DESC" });
+  assert.deepEqual(JSON.parse(JSON.stringify(api._test.builderSelectionFromSource(tag))), {
+    scope: "tag",
+    ids: ["12"],
+    includeDescendants: true
+  });
+
+  const all = api._test.sourceForScope("all", [], false, { sort: "path", direction: "ASC" });
+  assert.equal(api._test.builderSelectionFromSource(all).scope, "all");
+  assert.equal(api._test.builderSelectionFromSource({ ids: ["1", "2"] }), null);
+  assert.equal(api._test.builderSelectionFromSource({ imageFilter: { tags: { value: ["12"], modifier: "INCLUDES" }, organized: true } }), null);
+});
+
 test("next image calculation wraps only when loop is enabled", () => {
   const { api } = loadPlugin();
   assert.equal(api._test.nextIndex(2, 1, 3, true), 0);
